@@ -1,0 +1,22 @@
+<h1>Hello</h1>
+<ul id="list"></ul>
+
+<script>
+    const url = new URL(location.href);
+    const orderId = url.searchParams.get('orderId');
+    if (orderId) {
+        const evtSource = new EventSource("/events?orderId=" + orderId);
+        evtSource.onmessage = (event) => {
+            const newElement = document.createElement("li");
+            const eventList = document.getElementById("list");
+
+            console.log(event);
+            newElement.textContent = `${event.data}`;
+            eventList.appendChild(newElement);
+        };
+
+        evtSource.onerror = (err) => {
+            console.error('event source error', err);
+        }
+    }
+</script>
