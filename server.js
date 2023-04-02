@@ -1,11 +1,11 @@
 const http = require('node:http');
 const readFile = require('fs/promises').readFile;
 const Redis = require("ioredis");
-const sub = new Redis();
-const pub = new Redis(); // for blocking event reading
+const sub = new Redis(); // for blocking event reading
+const pub = new Redis();
 
 const hostname = '127.0.0.1';
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 const server = http.createServer(async (req, res) => {
   res.statusCode = 200;
