@@ -1,4 +1,4 @@
-# Example of how to use server side events and redis streams to garantee delivery of messages to client in multi node nodejs environment.
+# Example of how to use server side events and redis streams to garantee delivery of messages to client in multi node nodejs environment
 
 ## Running example
 
@@ -31,20 +31,19 @@ Client uses EventSource to listen to events for an order. If client is disconnec
 _Server_:
 
 Listens on events from a redis stream dedicated to this server instance. 
-Only this server instance will listen to this particular redis stream. Inst1, in this example, is the stream dedicated to this server. It should instead be named, for example server name + process id.
+Only this server instance will listen to this particular redis stream. 'inst1', in this example, is the stream dedicated to this server. In a production environment, streams should probably be named, for example server name + process id.
 
-The server starts receiving new events directly upon start. Events are sent to all connected clients and filtered depending on which order id each client is listening to.
+The server starts receiving new events from the redis stream directly upon start. Events are sent to all connected clients and filtered depending on which order id each client is listening to.
 
 If a client connects and sends 'last event id', it means that it is a reconnect and, in this case, fetch all events newer than this event.
 
-The following code reads all events after 'lastId' from 'inst1' stream. 
-60000 is the number of milliseconds to long poll.
+The following code reads all events after 'lastId' from 'inst1' stream. If at least one event exists on the stream, the command resolves directly. If no events exist, it will long poll for at most 60 seconds for new events.
 
     redis.xread('BLOCK', 60000, 'STREAMS', 'inst1', lastId)
 
 _Producer_:
 
-A producer is a separate process that handles updates from other services and adds these to the 'inst1' stream
+A producer is a separate process that handles updates from other services and adds these to the 'inst1' stream.
 
     redis.xadd('inst1', event)
 
@@ -76,6 +75,7 @@ Add event to 'inst1' stream
     - xadd has an ability to cap stream length; this could be useful
     - Still needs to remove old streams when a server instance is recycled and gets new name
         - Could have a job that lists streams in redis and removes all streams where the last event in the stream is older than certain time
+        
 ## Links
 
 Redis streams
