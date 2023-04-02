@@ -3,21 +3,30 @@
 <ul id="list"></ul>
 
 <script>
+    function log(message) {
+        const newElement = document.createElement("li");
+        const eventList = document.getElementById("list");
+
+        newElement.textContent = message;
+        eventList.appendChild(newElement);
+    }
+
     const url = new URL(location.href);
     const orderId = url.searchParams.get('orderId');
     if (orderId) {
         const evtSource = new EventSource("/events?orderId=" + orderId);
         evtSource.onmessage = (event) => {
-            const newElement = document.createElement("li");
-            const eventList = document.getElementById("list");
-
-            console.log(event);
-            newElement.textContent = `${event.data}`;
-            eventList.appendChild(newElement);
+            log(event.data);
         };
 
         evtSource.onerror = (err) => {
             console.error('event source error', err);
+            log('event source error: ' + err.message);
+        }
+
+        evtSource.onopen = (ev) => {
+            console.log('event source open', ev);
+            log('event source open');
         }
 
         document.getElementById('desc').innerText = 'Listening on updates to order ' + orderId;
