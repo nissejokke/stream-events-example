@@ -1,4 +1,5 @@
-<h1>Hello</h1>
+<h1>Event stream</h1>
+<p id="desc"></p>
 <ul id="list"></ul>
 
 <script>
@@ -18,5 +19,9 @@
         evtSource.onerror = (err) => {
             console.error('event source error', err);
         }
+
+        document.getElementById('desc').innerText = 'Listening on updates to order ' + orderId;
     }
+    else 
+        document.getElementById('desc').innerText = 'orderId query param missing';
 </script>

@@ -4,19 +4,24 @@
 
 Start server
 
-    node index.js
+    node server.js
 
 Start producer
 
-    node gen.js
+    node producer.js
 
-Browse to http://localhost:3000
+Open two tabs listening for events to two different orders
+
+    open http://localhost:3000/?orderId=1
+    open http://localhost:3000/?orderId=2
+
+Wait for events to be recieved. Try stopping server a while and starting it again. Client should get all missed events produced during the downtime.
 
 ## How it works
 
 _Client_:
 
-Client uses EventSource to listen to events for order 1. If client is disconnected it will try to reconnect and in that process send the id of the last event it saw.
+Client uses EventSource to listen to events for an order. If client is disconnected it will try to reconnect and in that process send the id of the last event it saw.
 
 ```javascript
     const evt = new EventSource('/events?orderId=1');
@@ -26,11 +31,14 @@ Client uses EventSource to listen to events for order 1. If client is disconnect
 _Server_:
 
 Listens on events from a redis stream dedicated to this server instance. 
-Only this server instance will listen to this perticular redis stream. Inst1 in this example should rather be for example servername + process 1.
+Only this server instance will listen to this perticular redis stream. Inst1 in this example is the stream dedicated to this server. It should rather be named for example servername + process id.
 
-This code either 1) long polls until a new event added to 'inst1' stream or 2) if lastId is set, reads all events added after lastId.
+The server starts receiving new events directly upon start. Events are sent to all connected clients and filtered depending on which order id each client is listening to.
 
-60000 is number of millisecconds to long poll.
+If a client connects and sends 'last event id' it means that it is a reconnect and it in this case fetch all events new that this event.
+
+The following code reads all events after 'lastId' from 'inst1' stream. 
+60000 is number of milliseconds to long poll.
 
     redis.xread('BLOCK', 60000, 'STREAMS', 'inst1', lastId)
 
@@ -42,25 +50,33 @@ A producer is a separate process that handles updates from other services and ad
 
 ## Multiple instances
 
-For a producer to know which instance streams to add events to a redis set is used
+When running in a multi node environment the producer must know which stream to updates to certain orders. For a producer to know which instance streams to add events to in this example a redis set is used.
 
 _Server_:
 
-When a client is connected it passes in which orders (or groups) it is interested in.
-The following adds inst1 to order:1 group.
+When a client is connected it joins a group.
+The following adds 'inst1' to 'order:1' group.
 
     redis.sadd('group:order:1', 'inst1')
 
 _Producer_:
 
-When updates from other services are retrivied for order:1 the producer knows which streams to add to
-by checkin which members are in order:1 group
+When updates from other services comes in for 'order:1' the producer knows which streams to add to
+by checkin which members are in 'order:1' group
 
     redis.smembers('group:order:1') // inst1
 
-    Add event to inst1 stream
+Add event to 'inst1' stream
 
     redis.xadd('inst1', event)
+
+##  Left to do
+
+- Sanitize members of groups in case of server crasch / recycle
+- Remove old events from stream
+    - xadd has an ability to cap stream length, this could be useful
+    - Still needs to remove old streams when server instance is recycled and gets new name
+        - Could have a job that lists streams in redis and removes all streams where the last event in the stream is older than a certain time
 
 ## Links
 

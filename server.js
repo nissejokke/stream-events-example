@@ -2,7 +2,7 @@ const http = require('node:http');
 const readFile = require('fs/promises').readFile;
 const Redis = require("ioredis");
 const sub = new Redis();
-const pub = new Redis();
+const pub = new Redis(); // for blocking event reading
 
 const hostname = '127.0.0.1';
 const port = 3000;
@@ -26,21 +26,29 @@ const server = http.createServer(async (req, res) => {
     const orderId = url.searchParams.get('orderId');
     const groups = ['user:1', `order:${orderId}`];
 
-    const processMessage = (message) => {
+    console.log('client connected', groups, 'lastEventId', lastEventId);
+
+    // join groups
+    await join(groups);
+
+    function handleEvent(message) {
         const [id, data] = message;
         const mess = {[data[0]]: data[1], [data[2]]: data[3]};
         if (groups.includes(mess.destination)) {
             console.log("Id: %s. Data: %O", id, data);
             res.write(`id: ${id}\ndata: ${data}\n\n`);
         }
-    };
-    console.log('client connected', groups, 'lastEventId', lastEventId);
+    }
 
-    // join groups
-    await join(groups);
+    // start listening on new events
+    subscribeToNewEvents(handleEvent);
 
-    // start listening on events
-    listenForEvents(processMessage, lastEventId);
+    // get all events since the last event client saw
+    // TODO: risk of getting the same message twice
+    if (lastEventId) {
+        const events = await getEventsSince(lastEventId);
+        events.forEach(ev => handleEvent(ev));
+    }
 
     // keep the connection open by sending a comment
     var keepAlive = setInterval(function() {
@@ -52,6 +60,8 @@ const server = http.createServer(async (req, res) => {
         clearInterval(keepAlive);
         // client disconnected leave groups
         leave(groups);
+        // remove from subscription
+        unsubscribeToNewEvents(handleEvent);
     });
   }
   else {
@@ -65,20 +75,32 @@ server.listen(port, hostname, async () => {
   console.log(`Server running at http://${hostname}:${port}/`);
 });
 
+listenForEvents();
+
+let eventCallbacks = [];
+function subscribeToNewEvents(callback) {
+    eventCallbacks.push(callback);
+}
+
+function unsubscribeToNewEvents(callback) {
+    eventCallbacks = eventCallbacks.filter(cb => cb !== callback);
+}
+
 /**
  * Listens for events
  * @link Based on https://github.com/luin/ioredis/blob/main/examples/stream.js
  */
-function listenForEvents(processMessage, lastId) {
-    
+function listenForEvents(lastId) {
    async function listenForMessage(lastId = "$") {
     // `results` is an array, each element of which corresponds to a key.
     // Because we only listen to one key (mystream) here, `results` only contains
     // a single element. See more: https://redis.io/commands/xread#return-value
-    const results = await sub.xread("BLOCK", 0, "STREAMS", "inst1", lastId);
+    // long poll for 60 seconds
+    const results = await sub.xread("BLOCK", 60000, "STREAMS", "inst1", lastId);
     if (results) {
         const [key, messages] = results[0]; // `key` equals to "inst1"
-        messages.forEach(processMessage);
+        for (const message of messages)
+            eventCallbacks.forEach(callback => callback(message));
   
         // Pass the last id of the results to the next round.
         await listenForMessage(messages[messages.length - 1][0]);
@@ -88,7 +110,15 @@ function listenForEvents(processMessage, lastId) {
   }
   
   listenForMessage(lastId);
+}
 
+async function getEventsSince(lastId) {
+    const results = await pub.xread("STREAMS", "inst1", lastId);
+    if (results) {
+        const [key, messages] = results[0];
+        return messages;
+    }
+    return [];
 }
 
 function join(groups) {
