@@ -123,12 +123,12 @@ async function getEventsSince(lastId) {
 
 function join(groups) {
     let pipeline = pub.pipeline()
-    groups.forEach(group => pipeline = pipeline.sadd('group:' + group, 'inst1'));
+    groups.forEach(group => pipeline = pipeline.hincrby('group:' + group, 'inst1', 1));
     return pipeline.exec();
 }
 
 function leave(groups) {
     let pipeline = pub.pipeline()
-    groups.forEach(group => pipeline = pipeline.srem('group:' + group, 'inst1'));
+    groups.forEach(group => pipeline = pipeline.hincrby('group:' + group, 'inst1', -1));
     return pipeline.exec();
 }

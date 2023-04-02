@@ -49,20 +49,21 @@ A producer is a separate process that handles updates from other services and ad
 
 ## Multiple instances
 
-When running in a multi-node environment, the producer must know which streams to update for specific orders. For a producer to know which instance streams to add events to, a redis set is used in this example.
+When running in a multi-node environment, the producer must know which streams to update for specific orders. For a producer to know which instance streams to add events to, a redis hash is used in this example.
 
 _Server_:
 
 When a client is connected, it joins a group.
-The following adds 'inst1' to 'order:1' group.
+The following adds increaces 'inst1' value of the 'order:1' group.
 
-    redis.sadd('group:order:1', 'inst1')
+    redis.hincrby('group:order:1', 'inst1', 1)
 
 _Producer_:
 
-When updates from other services come in for 'order:1', the producer knows which streams to add to by checking which members are in the 'order:1' group
+When updates from other services come in for 'order:1', the producer knows which streams to add to by checking which instances have > 0 value in the 'order:1' group
 
-    redis.smembers('group:order:1') // inst1
+    redis.hmgetall('group:order:1') 
+    // inst1: 1
 
 Add event to 'inst1' stream
 
@@ -75,7 +76,7 @@ Add event to 'inst1' stream
     - xadd has an ability to cap stream length; this could be useful
     - Still needs to remove old streams when a server instance is recycled and gets new name
         - Could have a job that lists streams in redis and removes all streams where the last event in the stream is older than certain time
-        
+
 ## Links
 
 Redis streams
