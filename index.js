@@ -10,7 +10,6 @@ const port = 3000;
 const server = http.createServer(async (req, res) => {
   res.statusCode = 200;
   const url = new URL(req.url, 'http://' + hostname);
-  console.log('->', url.pathname)
   if (url.pathname === '/') {
     res.setHeader('Content-Type', 'text/html');
     res.end(await readFile('index.html'));
@@ -37,7 +36,10 @@ const server = http.createServer(async (req, res) => {
     };
     console.log('client connected', groups, 'lastEventId', lastEventId);
 
+    // join groups
     await join(groups);
+
+    // start listening on events
     listenForEvents(processMessage, lastEventId);
 
     // keep the connection open by sending a comment
@@ -48,10 +50,12 @@ const server = http.createServer(async (req, res) => {
     // cleanup on close
     res.on('close', function close() {
         clearInterval(keepAlive);
+        // client disconnected leave groups
         leave(groups);
     });
   }
   else {
+      res.statusCode = 404;
     res.setHeader('Content-Type', 'text/plain');
     res.end('Not found\n');
   }
@@ -61,15 +65,19 @@ server.listen(port, hostname, async () => {
   console.log(`Server running at http://${hostname}:${port}/`);
 });
 
+/**
+ * Listens for events
+ * @link Based on https://github.com/luin/ioredis/blob/main/examples/stream.js
+ */
 function listenForEvents(processMessage, lastId) {
     
    async function listenForMessage(lastId = "$") {
     // `results` is an array, each element of which corresponds to a key.
     // Because we only listen to one key (mystream) here, `results` only contains
     // a single element. See more: https://redis.io/commands/xread#return-value
-    const results = await sub.xread("BLOCK", 60000, "STREAMS", "pid1", lastId);
+    const results = await sub.xread("BLOCK", 0, "STREAMS", "inst1", lastId);
     if (results) {
-        const [key, messages] = results[0]; // `key` equals to "user-stream"
+        const [key, messages] = results[0]; // `key` equals to "inst1"
         messages.forEach(processMessage);
   
         // Pass the last id of the results to the next round.
@@ -85,12 +93,12 @@ function listenForEvents(processMessage, lastId) {
 
 function join(groups) {
     let pipeline = pub.pipeline()
-    groups.forEach(group => pipeline = pipeline.sadd('group:' + group, 'pid1'));
+    groups.forEach(group => pipeline = pipeline.sadd('group:' + group, 'inst1'));
     return pipeline.exec();
 }
 
 function leave(groups) {
     let pipeline = pub.pipeline()
-    groups.forEach(group => pipeline = pipeline.srem('group:' + group, 'pid1'));
+    groups.forEach(group => pipeline = pipeline.srem('group:' + group, 'inst1'));
     return pipeline.exec();
 }

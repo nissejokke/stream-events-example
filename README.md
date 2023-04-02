@@ -1,38 +1,71 @@
-# Event streams
+# Example of how to use server side events and redis streams to garantee delivery of messages to client in multi node nodejs environment.
 
-    Klient:
+## Running example
 
-        Klienten longpollar efter events (med EventSource i javascript)
+Start server
 
-        GET /events?orderId=1
+    node index.js
 
-    Server:
+Start producer
 
-        Lyssnar på events från en stream dedikerad den instansen av fo.web, 
-        endast den instansen av fo.web kommer lyssna på events från den streamen.
-        xread långpollar upp till 60 sekunder i väntan på nya events ned följande anrop
+    node gen.js
 
-        redis.xread('BLOCK', 60000, 'STREAMS', 'pid1', lastId)
+Browse to http://localhost:3000
 
-    Fo.web.jobs:
+## How it works
 
-        redis.xadd('pid1', event)
+_Client_:
 
+Client uses EventSource to listen to events for order 1. If client is disconnected it will try to reconnect and in that process send the id of the last event it saw.
 
-För att veta vilken instans av fo.web som jobs ska publicera events till så används ett set i redis
+```javascript
+    const evt = new EventSource('/events?orderId=1');
+    evt.onmessage = (event) => {};
+```
 
-    Server:
+_Server_:
 
-        Nä klient ansluter så läggs den instansen till i ett set
-        Detta säger att events för order 1 ska skickas till pid1
+Listens on events from a redis stream dedicated to this server instance. 
+Only this server instance will listen to this perticular redis stream. Inst1 in this example should rather be for example servername + process 1.
 
-        redis.sadd('group:order:1', 'pid1')
+This code either 1) long polls until a new event added to 'inst1' stream or 2) if lastId is set, reads all events added after lastId.
 
-    Fo.web.jobs:
+60000 is number of millisecconds to long poll.
 
-        När ett event kommmer från oms som tillhör order 1 så kan jobs ta reda på vilka instanser
-        det eventet ska publiceras på genom att hämta ut vilka instanser som är knutna till order 1
+    redis.xread('BLOCK', 60000, 'STREAMS', 'inst1', lastId)
 
-        redis.smembers('group:order:1') // pid1
-        redis.xadd('pid1', event)
+_Producer_:
 
+A producer is a separate process that handles updates from other services and adds these to the 'inst1' stream
+
+    redis.xadd('inst1', event)
+
+## Multiple instances
+
+For a producer to know which instance streams to add events to a redis set is used
+
+_Server_:
+
+When a client is connected it passes in which orders (or groups) it is interested in.
+The following adds inst1 to order:1 group.
+
+    redis.sadd('group:order:1', 'inst1')
+
+_Producer_:
+
+When updates from other services are retrivied for order:1 the producer knows which streams to add to
+by checkin which members are in order:1 group
+
+    redis.smembers('group:order:1') // inst1
+
+    Add event to inst1 stream
+
+    redis.xadd('inst1', event)
+
+## Links
+
+Redis streams
+https://redis.io/docs/data-types/streams/
+
+EventSource
+https://developer.mozilla.org/en-US/docs/Web/API/EventSource
