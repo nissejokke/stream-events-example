@@ -53,14 +53,14 @@ When running in a multi-node environment, the producer must know which streams t
 
 _Server_:
 
-When a client is connected, it joins a group.
-The following adds increaces 'inst1' value of the 'order:1' group.
+When a client is connected, it joins a group. A hash is used to keep track of how many clients connected to a certain instance for a certain order.
+The following increaces 'inst1' value of the 'order:1' group.
 
     redis.hincrby('group:order:1', 'inst1', 1)
 
 _Producer_:
 
-When updates from other services come in for 'order:1', the producer knows which streams to add to by checking which instances have > 0 value in the 'order:1' group
+When updates from other services comes in for let's say 'order:1', the producer knows which streams to add the event to by checking which instances have > 0 value in the 'order:1' group
 
     redis.hmgetall('group:order:1') 
     // inst1: 1
@@ -76,6 +76,7 @@ Add event to 'inst1' stream
     - xadd has an ability to cap stream length; this could be useful
     - Still needs to remove old streams when a server instance is recycled and gets new name
         - Could have a job that lists streams in redis and removes all streams where the last event in the stream is older than certain time
+- To detect broken event source connection on client the connection should be closed and reopened if no ping messages recieved from server in a given amount of time
 
 ## Links
 

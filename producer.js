@@ -16,7 +16,7 @@ setInterval(async () => {
 
 let count2 = 20;
 setInterval(async () => {
-  const obj = await pub.hgetall('group:order:1');
+  const obj = await pub.hgetall('group:order:2');
   const pids = Object.keys(obj).filter(key => obj[key] > 0)
 
   for (const pid of pids) {
