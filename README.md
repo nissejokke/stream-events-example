@@ -69,6 +69,10 @@ Add event to 'inst1' stream
 
     redis.xadd('inst1', event)
 
+## Reconnection
+
+To detect broken event source connection on client the connection is closed and reopened if no ping messages recieved from server in a given amount of time
+
 ##  Left to do
 
 - Sanitize members of groups in case of a server crash / recycle
@@ -76,7 +80,6 @@ Add event to 'inst1' stream
     - xadd has an ability to cap stream length; this could be useful
     - Still needs to remove old streams when a server instance is recycled and gets new name
         - Could have a job that lists streams in redis and removes all streams where the last event in the stream is older than certain time
-- To detect broken event source connection on client the connection should be closed and reopened if no ping messages recieved from server in a given amount of time
 
 ## Links
 

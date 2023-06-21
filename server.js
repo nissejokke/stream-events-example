@@ -22,21 +22,26 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader('Connection', 'keep-alive');
 
-    const lastEventId = req.headers['last-event-id'];
+    const lastEventId = url.searchParams.get('lastEventId') || req.headers['last-event-id'];
     const orderId = url.searchParams.get('orderId');
-    const groups = ['user:1', `order:${orderId}`];
+    const groups = [`order:${orderId}`];
 
     console.log('client connected', groups, 'lastEventId', lastEventId);
 
     // join groups
     await join(groups);
 
-    function handleEvent(message) {
-        const [id, data] = message;
-        const mess = {[data[0]]: data[1], [data[2]]: data[3]};
-        if (groups.includes(mess.destination)) {
-            console.log("Id: %s. Data: %O", id, data);
-            res.write(`id: ${id}\ndata: ${data}\n\n`);
+    function handleEvent(event) {
+        const [id, data] = event;
+        let message = {};
+        // convert ['prop', 'value', 'prop2', 'value2'] to { prop: 'value', prop2: 'value2' }
+        for (let i = 0; i < data.length; i += 2) {
+            message[data[i]] = data[i + 1];
+        }
+
+        if (message.type === 'order' && orderId === message.orderId) {
+            console.log(`${id}: ${JSON.stringify(message)}`);
+            res.write(`id: ${id}\ndata: ${JSON.stringify(message)}\n\n`);
         }
     }
 
@@ -44,7 +49,7 @@ const server = http.createServer(async (req, res) => {
     subscribeToNewEvents(handleEvent);
 
     // get all events since the last event client saw
-    // TODO: risk of getting the same message twice
+    // TODO: risk of getting the same message twice?
     if (lastEventId) {
         const events = await getEventsSince(lastEventId);
         events.forEach(ev => handleEvent(ev));
@@ -52,7 +57,7 @@ const server = http.createServer(async (req, res) => {
 
     // keep the connection open by sending a comment
     var keepAlive = setInterval(function() {
-        res.write(':keep-alive\n\n');
+        res.write('data: {"type":"ping"}\n\n');
     }, 20000);
 
     // cleanup on close
@@ -71,7 +76,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, hostname, async () => {
+server.listen(port, undefined, async () => {
   console.log(`Server running at http://${hostname}:${port}/`);
 });
 

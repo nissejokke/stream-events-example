@@ -8,7 +8,7 @@ setInterval(async () => {
   const pids = Object.keys(obj).filter(key => obj[key] > 0);
 
   for (const pid of pids) {
-    await pub.xadd(pid, "*", "destination", "order:1", "count", count1);
+    await pub.xadd(pid, "*", "type", "order", "orderId", "1", "count", count1);
   }
   if (pids.length)
     count1++;
@@ -20,7 +20,7 @@ setInterval(async () => {
   const pids = Object.keys(obj).filter(key => obj[key] > 0)
 
   for (const pid of pids) {
-    await pub.xadd(pid, "*", "destination", "order:2", "count", count2);
+    await pub.xadd(pid, "*", "type", "order", "orderId", "2", "count", count2);
   }
   if (pids.length)
     count2++;
