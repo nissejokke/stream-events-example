@@ -14,7 +14,12 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'text/html');
     res.end(await readFile('index.html'));
   }
-  else if (url.pathname === '/events') {    
+  else if (url.pathname === '/events') {
+    // simulate server error
+    // res.statusCode = 403;
+    // res.end();
+    // return;
+
     req.socket.setKeepAlive(true);
     req.socket.setTimeout(0);
 
@@ -22,7 +27,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader('Connection', 'keep-alive');
 
-    const lastEventId = url.searchParams.get('lastEventId') || req.headers['last-event-id'];
+    const lastEventId = req.headers['last-event-id'] || url.searchParams.get('lastEventId');
     const orderId = url.searchParams.get('orderId');
     const groups = [`order:${orderId}`];
 

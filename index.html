@@ -11,7 +11,9 @@
         eventList.appendChild(newElement);
     }
 
-    function listenToEvents(orderId, lastEventId) {
+    let lastEventId;
+
+    function listenToEvents(orderId) {
         let lastPing = new Date();
         log('Attempting to listen on updates to order ' + orderId);
         const evtSource = new EventSource('/events?orderId=' + orderId + (lastEventId ? '&lastEventId=' + lastEventId : ''));
@@ -19,8 +21,7 @@
             const { data } = event;
             log(data);
             const message = JSON.parse(data);
-            if (message.type === 'ping')
-                lastPing = new Date();
+            lastPing = new Date();
             if (event.lastEventId)
                 lastEventId = event.lastEventId;
         };
@@ -43,7 +44,7 @@
                 lastPing = null;
                 log('Event source closed, broken connection');
                 clearInterval(pingInterval);
-                listenToEvents(orderId, lastEventId);
+                listenToEvents(orderId);
             }
         }, 1000);
     }
